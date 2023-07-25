@@ -1,2 +1,3 @@
-# pytorch-examples
-Fun with PyTorch.
+# PyTorch Examples
+
+Implementation playground for educational purposes.
