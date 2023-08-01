@@ -5,6 +5,8 @@ from torch import nn
 class MLP(nn.Module):
     def __init__(self, input_size, output_size, dropout=0.2):
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
         self.classifier = nn.Sequential(
             # Layer 1
             nn.Linear(input_size, 128),
@@ -22,8 +24,9 @@ class MLP(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=dropout),
             # Output
-            nn.Linear(32, output_size)
+            nn.Linear(32, output_size),
         )
 
     def forward(self, x: torch.Tensor):
+        x = x.view(-1, self.input_size)
         return self.classifier(x)

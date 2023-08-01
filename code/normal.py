@@ -8,21 +8,23 @@ class DeepNormal(nn.Module):
         super().__init__()
 
         self.jitter = 1e-6
-        self.embedding = nn.Linear(input_size, hidden_size)
-        self.mean = nn.Sequential(
-            nn.Linear(hidden_size, hidden_size),
-            nn.BatchNorm1d(hidden_size),
+        self.embedding = nn.Sequential(
+            nn.Linear(input_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(p=dropout),
-            nn.Linear(hidden_size, 1)
         )
-        self.std = nn.Sequential(
+        self.mean = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
-            nn.BatchNorm1d(hidden_size),
             nn.ReLU(),
             nn.Dropout(p=dropout),
             nn.Linear(hidden_size, 1),
-            nn.Softplus()
+        )
+        self.std = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_size, 1),
+            nn.Softplus(),
         )
 
     def forward(self, x: torch.Tensor) -> td.Normal:
