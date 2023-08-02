@@ -89,11 +89,11 @@ class DeepMultivariateNormal(nn.Module):
         distr_dimension = torch.numel(std)
 
         corr_vec = self.correlation(embedding)
-        corr_spaced = torch.zeros(distr_dimension - 1)
+        corr_spaced = torch.zeros(distr_dimension - 1, device=x.device)
         corr_spaced[::2] = corr_vec.flatten()
 
         # Construct correlation matrix of size (batch * labels) x (batch * labels)
-        corr_diag = torch.eye(distr_dimension)
+        corr_diag = torch.eye(distr_dimension, device=x.device)
         corr_upper = torch.diag_embed(corr_spaced, offset=1)
         corr_lower = torch.diag_embed(corr_spaced, offset=-1)
         corr = corr_diag + corr_upper + corr_lower
