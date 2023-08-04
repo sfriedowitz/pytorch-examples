@@ -43,6 +43,7 @@ class DeepMultivariateNormal(nn.Module):
     def __init__(self, input_size: int, hidden_size: int, label_size: int, dropout: float = 0.2):
         super().__init__()
 
+        self.event_dim = label_size
         self.jitter = 1e-6
 
         self.embedding = nn.Sequential(
@@ -56,7 +57,7 @@ class DeepMultivariateNormal(nn.Module):
             nn.Dropout(p=dropout),
             nn.Linear(hidden_size, label_size),
         )
-        self.std = nn.Sequential(
+        self.variance = nn.Sequential(
             nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(p=dropout),
@@ -79,26 +80,16 @@ class DeepMultivariateNormal(nn.Module):
 
         # Compute flattened mean vector
         mean = self.mean(embedding)
-        mean = mean.flatten()
 
-        # Compute std as a flattened vector
-        std = self.std(embedding) + self.jitter
-        std = std.flatten().reshape(-1, 1)
+        # Compute std and corr and fill into a matrix
+        var = self.variance(embedding) + self.jitter
+        corr = self.correlation(embedding)
 
-        # Compute corr and embed into upper/lower 2nd diagonals of matrix
-        distr_dimension = torch.numel(std)
+        # Fill var and corr into a tril matrix for MVN
+        # var down the diagonal, corr in lower tril portion without main diagonal
+        tril_row, tril_col = torch.tril_indices(self.event_dim, self.event_dim, offset=-1)
 
-        corr_vec = self.correlation(embedding)
-        corr_spaced = torch.zeros(distr_dimension - 1, device=x.device)
-        corr_spaced[::2] = corr_vec.flatten()
+        cov = torch.diag_embed(var)
+        cov[:, tril_row, tril_col] = corr
 
-        # Construct correlation matrix of size (batch * labels) x (batch * labels)
-        corr_diag = torch.eye(distr_dimension, device=x.device)
-        corr_upper = torch.diag_embed(corr_spaced, offset=1)
-        corr_lower = torch.diag_embed(corr_spaced, offset=-1)
-        corr = corr_diag + corr_upper + corr_lower
-
-        # Rescale to cov matrix
-        cov = std.T * corr * std
-
-        return td.MultivariateNormal(mean, cov)
+        return td.MultivariateNormal(loc=mean, scale_tril=cov)
