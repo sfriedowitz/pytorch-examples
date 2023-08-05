@@ -37,7 +37,7 @@ class DeepNormal(nn.Module):
 class DeepMultivariateNormal(nn.Module):
     """Parameterize the MVN by a learned mean, standard deviation, and correlations across labels.
 
-    Constrain the correlations to [-1, 1] and learn only the lower triangular portion.
+    Only learn the lower triangular portion for numerical stability.
     """
 
     def __init__(self, input_size: int, hidden_size: int, label_size: int, dropout: float = 0.2):
@@ -48,6 +48,9 @@ class DeepMultivariateNormal(nn.Module):
 
         self.embedding = nn.Sequential(
             nn.Linear(input_size, hidden_size),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_size, hidden_size),
             nn.ReLU(),
             nn.Dropout(p=dropout),
         )
@@ -71,14 +74,13 @@ class DeepMultivariateNormal(nn.Module):
             nn.ReLU(),
             nn.Dropout(p=dropout),
             nn.Linear(hidden_size, correlation_size),
-            nn.Tanh(),
         )
 
     def forward(self, x: torch.Tensor) -> td.MultivariateNormal:
         # Compute shared embedding vector
         embedding = self.embedding(x)
 
-        # Compute flattened mean vector
+        # Compute mean vector for each label
         mean = self.mean(embedding)
 
         # Compute std and corr and fill into a matrix
@@ -86,7 +88,7 @@ class DeepMultivariateNormal(nn.Module):
         corr = self.correlation(embedding)
 
         # Fill var and corr into a tril matrix for MVN
-        # var down the diagonal, corr in lower tril portion without main diagonal
+        # var down the diagonal, corr in tril portion without main diagonal
         tril_row, tril_col = torch.tril_indices(self.event_dim, self.event_dim, offset=-1)
 
         cov = torch.diag_embed(var)
